@@ -1,83 +1,322 @@
-# Healthcare Analytics: End-to-End Financial & Operational Dashboard
+# Healthcare Analytics — Data Cleaning, ETL & Dashboard
 
-##  Project Overview
-This project analyzes a healthcare dataset of **55,500 patient records** to uncover operational and financial insights. I developed an end-to-end pipeline—from raw data cleaning to interactive visualization—to help hospital administrators track revenue and patient trends.
+## Project Overview
+This project focuses on transforming raw healthcare transactional data into a
+clean, analysis-ready dataset and building an interactive two-page dashboard
+that gives hospital leadership a full view of revenue, admissions, patient
+demographics, medical conditions, medications, and year-over-year trends. The
+dataset covers 55,500 patient admission records spanning 2019 through 2024
+across 15 columns.
 
-DATASET 
-<img width="1440" height="751" alt="Screenshot 2026-05-04 at 4 18 55 AM" src="https://github.com/user-attachments/assets/44ef9a85-3556-4284-8e0a-a73ca51ac452" />
+Financial Dashbaord 
+## <img width="1009" height="679" alt="Financial Analysis Healthcare " src="https://github.com/user-attachments/assets/ba9f44a4-4916-470e-b4b2-79846749e147" />
 
-
-## Tools Used
-* **Excel:** Data cleaning and initial Exploratory Data Analysis (EDA).
-* **SQL:** Data manipulation and trend calculations.
-* **Power BI:** Dashboard design, DAX measures, and data storytelling.
-
-##  The Data Process
-
-### 1. Data Cleaning & Feature Engineering (Excel)
-* Standardized formatting for patient and doctor names to ensure data integrity.
-* 
-The first step was pulling the raw data from its source — a flat CSV file — and loading it into a staging environment where I could inspect it without modifying the original. Preserving the raw source is important because if something goes wrong during cleaning, I need to be able to roll back.
-During extraction, I also verified the basic structure: row count, column names, and inferred data types. One issue I caught immediately was that the date columns (Date of Admission and Discharge Date) were loaded as plain strings rather than proper date objects — something I flagged to fix in the Transform phase.
-
-Null / Missing Values
-When I ran a null check across all 15 columns, every column returned zero nulls. Rather than treating that as a green light, I questioned it — real healthcare data at 55,500 rows almost always has some missingness. A fully complete dataset usually means missing values were filled in upstream with placeholder text like "N/A", "Unknown", or empty strings before I received the file.
-To address this, I scanned each categorical column for fake non-null values and applied .str.strip() to catch hidden whitespace. For any numeric column like Billing Amount or Age where true nulls might appear in future data loads, I established rules: impute the median for age where appropriate, and flag missing billing amounts rather than guessing a dollar value.
-Duplicate Records
-I found 534 exact duplicate rows — records that matched another row in every single column, from the patient name and age down to the billing amount and discharge date. These were not separate visits by the same patient; they were identical copies of the same record, likely caused by a pipeline running more than once or a double submission at the source system.
-I removed them using drop_duplicates(), bringing the dataset from 55,500 rows down to 54,966 rows. Leaving those duplicates in would have inflated every count-based metric in the analysis — total admissions, average billing per condition, patient volume by hospital, and so on.
-Inconsistent Formatting
-The most immediately visible issue was in the Name column. The first few rows alone showed entries like Bobby JacksOn, LesLie TErRy, DaNnY sMitH, and EMILY JOHNSOn — random mixed casing that was almost certainly the result of manual data entry across multiple systems with no input validation.
-This matters because inconsistent casing breaks deduplication and joins. Bobby Jackson, BOBBY JACKSON, and BoBby jACKson would be treated as three different people by SQL or any BI tool. I standardized all names to Title Case using .str.title() and applied .str.strip() across all text columns to remove any trailing or leading whitespace that could cause silent mismatches in grouping and filtering.
-Date Overlapping / Logical Inconsistencies
-I checked for a specific type of error that is common in healthcare data: a patient's discharge date falling before their admission date, which is logically impossible. I did this by converting both date columns to proper datetime objects and computing a derived Length of Stay field as Discharge Date − Date of Admission. Any negative value would indicate an inverted date range.
-After running the check across all 54,966 cleaned records, I found zero overlapping date records — length of stay ranged from 1 to 30 days with a mean of approximately 15.5 days. I also cross-validated edge cases, such as same-day admissions and discharges for serious conditions, and flagged those for clinical review rather than automatic removal.
-Outliers and Invalid Numeric Values
-I found that the Billing Amount column had a minimum value of -$2,008 — a negative charge. This could represent a refund, a credit adjustment, or a data entry error that was stored in the wrong field. I did not delete those rows outright since the rest of the patient record was valid. Instead, I flagged them and established a business rule: negative billing values are separated into an Adjustments category and excluded from standard billing analyses.
-The Age column was clean — values ranged from 13 to 89 with no negatives or impossible values.
-
-I enforced proper data types at the schema level: Date of Admission and Discharge Date as DATE types, Billing Amount as DECIMAL, and Age as INTEGER. I also defined constraints — for example, Billing Amount >= 0 and Discharge Date >= Date of Admission — so that future data loads are validated against the same rules automatically.
+Health care over view 
+<img width="795" height="804" alt="Health care analytics" src="https://github.com/user-attachments/assets/bc04b552-b635-4222-bb17-ea66f9c85ccd" />
 
 
 
-### 2. Advanced Analysis (SQL)
-* Aggregated total billing by Insurance Provider and Hospital.
-* Calculated Year-over-Year (YoY) admission trends to identify growth patterns.
-* Filtered top-performing doctors based on patient volume and revenue generation.
+## The Data Analysis Process
+I followed a 3-stage ETL framework to move from raw data to a finished dashboard:
 
-### 3. Interactive Visualization (Power BI)
-* **Overview Dashboard:** Visualizes patient demographics, admission types, and YoY trends.
-* <img width="795" height="804" alt="Health care analytics" src="https://github.com/user-attachments/assets/7e29d7c1-ce2d-4ad6-aa8d-2f2075ef13e8" />
+1. **Extract:** Loaded the raw CSV into a pandas DataFrame as a staging
+   environment, confirmed the shape as 55,500 rows and 15 columns, and
+   immediately flagged that `Date of Admission` and `Discharge Date` were
+   loaded as plain strings instead of datetime objects, that `Billing Amount`
+   contained negative values, and that the `Name` column had severe random
+   casing inconsistencies across all records
+2. **Transform:** Applied all cleaning operations across six categories —
+   null validation, duplicate removal, name casing standardization, whitespace
+   correction, date type conversion and logical validation, negative billing
+   handling, age group bucketing, and data type enforcement
+3. **Dashboard Construction:** Built the Healthcare Analytics Dashboard in
+   Power BI across two pages — Overview and Financial Analysis — covering
+   KPI cards, blood type distributions, medical condition breakdowns,
+   insurance provider comparisons, medication distributions, gender and
+   admission type donut charts, test result distributions, age bucket
+   breakdowns, and a year-over-year admission trend line
 
-* **Financial Analysis:** Tracks total revenue ($1.42bn) and breaks down billing by insurance provider.
-* <img width="795" height="804" alt="Health care analytics" src="https://github.com/user-attachments/assets/403aa08a-e31f-46b9-ae0f-5c3baa22299b" />
+## Data Cleaning Steps
 
+### Null & Missing Values
+- **Null Check:** Ran `.isnull().sum()` across all 15 columns — returned
+  **zero null values** across every column in the entire dataset
+- **Verification:** Did not accept that result at face value — at 55,500
+  records, a fully clean null report often means missing values were filled
+  upstream with placeholder text like `"N/A"` or `"Unknown"` before the
+  file was delivered
+- **Whitespace Audit:** Applied `.str.strip()` across all text columns
+  because a value like `"Cancer "` with a trailing space passes a null
+  check but is treated as a completely different category by SQL, pandas,
+  and every BI tool including Power BI
+- **Controlled Vocabulary Verification:** After stripping, confirmed the
+  unique value counts for all categorical columns:
+  - **Medical Condition** — 6 values: Arthritis, Diabetes, Hypertension,
+    Obesity, Cancer, Asthma
+  - **Admission Type** — 3 values: Elective, Urgent, Emergency
+  - **Medication** — 5 values: Lipitor, Ibuprofen, Aspirin, Paracetamol,
+    Penicillin
+  - **Test Results** — 3 values: Abnormal, Normal, Inconclusive
+  - **Gender** — 2 values: Male, Female
+  - **Blood Type** — 8 values: all standard ABO/Rh combinations
+  - **Insurance Provider** — 5 values: Cigna, Medicare, UnitedHealthcare,
+    Blue Cross, Aetna
+- **Forward-Looking Rules:** Established imputation rules for future loads:
+  - **Age** — impute the median if nulls appear, not the mean, since age
+    distributions in clinical data tend to be skewed
+  - **Billing Amount** — flag missing values rather than imputing, because
+    guessing a dollar amount has direct financial reporting consequences
+  - **Categorical columns** — standardize to `"Unknown"` rather than
+    dropping the row, preserving the rest of the record
 
-##  Key Business Insights
-* **Demographics:** Middle Age and Senior patients represent nearly **69%** of total admissions.
-* **Revenue Drivers:** Cigna and Medicare are the primary insurance contributors, each exceeding **$285M** in total billing.
-* **Growth:** Analysis shows a significant volume peak between 2019 and 2020.
+### Duplicate Records
+- **Discovery:** Ran `df.duplicated().sum()` and found **534 exact duplicate
+  rows** — records that matched another row in all 15 columns, from patient
+  name and age all the way down to billing amount and discharge date
+- **Root Causes:** Identified likely causes as an ETL pipeline that ran more
+  than once without checking for existing records, a manual form submitted
+  twice, or a source system bug that logged the same admission event twice
+- **Resolution:** Removed all 534 duplicates using `drop_duplicates()`,
+  reducing the dataset from **55,500 rows to 54,966 rows**
+- **Impact:** Leaving duplicates in would have overstated every count-based
+  metric on the dashboard — the Total No. of Admissions KPI showing 40,235,
+  the medical condition breakdowns, the insurance provider volumes, and the
+  year-over-year admission trend line would all have been inflated by phantom
+  records that never occurred
 
-* Business Impact
-Why Data Quality Directly Affects Decision-Making
-Every report, dashboard, and business decision built on top of this dataset is only as reliable as the data underneath it. The cleaning and ETL work I performed was not just a technical exercise — each issue I resolved had a direct downstream effect on the accuracy of insights, the reliability of operations, and the integrity of financial reporting.
+### Inconsistent Name Formatting
+- **Discovery:** Inspected the `Name` column and found severe random casing
+  across all records — examples included `Bobby JacksOn`, `LesLie TErRy`,
+  `DaNnY sMitH`, `EMILY JOHNSOn`, `andrEw waTtS`, and `CHrisTInA MARtinez`
+- **Root Cause:** Manual data entry across multiple systems with no input
+  validation enforcing a consistent format at the point of capture
+- **Functional Impact:**
+  - `Bobby Jackson`, `BOBBY JACKSON`, and `BoBby jACKson` are treated as
+    three completely different people by SQL, pandas, and every BI tool
+  - Any readmission tracking built on name matching would fail — a returning
+    patient recorded under a different format would not be matched to their
+    previous visit
+  - Name-based duplicate detection would produce false negatives — true
+    duplicates would go undetected because the strings did not match exactly
+- **Resolution:** Standardized all 55,500 names to Title Case using
+  `.str.title()` in a single operation and applied `.str.strip()` to remove
+  any surviving leading or trailing whitespace
 
-Impact of Removing 534 Duplicate Records
-Before deduplication, the dataset contained 534 records that were exact copies of real patient admissions. Had I left those in, every count-based metric in the analysis would have been overstated. Patient admission volumes would have been inflated, average billing calculations would have been skewed, and any model trained on this data would have learned from false observations.
-For a healthcare organization, overcounted admissions can affect staffing decisions, bed allocation planning, and insurance reimbursement reporting. If a hospital reports more admissions than actually occurred, it misrepresents its capacity utilization and could trigger compliance issues with insurers or regulators. By removing those 534 rows, I ensured that every metric downstream reflects what actually happened.
+### Date Type Conversion & Logical Validation
+- **Type Conversion:** Both `Date of Admission` and `Discharge Date` were
+  loaded as plain string objects — converted both to proper datetime objects
+  using `pd.to_datetime()` so date arithmetic, filtering, and time-series
+  aggregations behave consistently across every tool and query
+- **LOS Derivation:** Created a derived **Length of Stay** column calculated
+  as `Discharge Date − Date of Admission` in days to validate date logic
+- **Overlap Check:** Checked for any record where discharge date fell before
+  admission date — returned **zero violations** across all 55,500 records
+- **LOS Statistics:** Confirmed the distribution was internally consistent:
+  - **Minimum LOS** — 1 day
+  - **Maximum LOS** — 30 days
+  - **Mean LOS** — approximately 15.5 days
+- **Year Range Confirmed:** Admissions spanned **2019 through 2024** —
+  matching the Admission Trend YoY line chart visible on the dashboard
+  showing the growth from 7.4K in 2019 to a peak of 11.0K in 2022-2023
+  before dropping to 3.9K in 2024 as the most recent partial year
 
-Impact of Standardizing Patient Names
-The inconsistent casing in the Name column — entries like LesLie TErRy and EMILY JOHNSOn — is more than an aesthetic problem. In any system that uses names as a matching key to link records across tables or time periods, inconsistent formatting causes the same person to appear as multiple distinct individuals.
-This has real consequences. A patient readmitted under a slightly different name format would not be recognized as a returning patient, breaking any readmission rate analysis. Marketing or outreach campaigns built on patient history would send duplicate communications. Any longitudinal analysis tracking a patient's condition over time would fragment into disconnected records. Standardizing to Title Case ensures that name-based lookups and joins behave consistently across the entire pipeline.
+### Negative Billing Amounts
+- **Discovery:** Ran `.describe()` on `Billing Amount` and found **108
+  records with negative values**, with a minimum of **-$2,008.49**
+- **Investigation:** A negative charge in a field meant to represent patient
+  billing does not make sense as a raw admission charge — likely caused by
+  refund or credit adjustments stored in the wrong field, data entry errors
+  with accidental minus signs, or financial corrections not separated from
+  original charges at the source system
+- **Resolution:**
+  - Did not delete those rows — the rest of the patient record was still
+    valid clinical and operational data
+  - Flagged all 108 negative billing records with a boolean column
+    `is_billing_adjustment = True`
+  - Moved them into a dedicated Adjustments category for accounting
+    reconciliation
+  - Built all billing dashboards and the Total Revenue KPI of **$1.42bn**
+    on the filtered dataset excluding flagged records so the figure
+    reflects only actual patient charges
 
-Impact of Resolving Negative Billing Amounts
-The presence of billing amounts as low as -$2,008 in a field meant to capture patient charges is a financial data integrity problem. If those values flow unchecked into a revenue reporting dashboard, total revenue figures would be understated, average billing per condition would be distorted, and any forecasting model built on billing trends would produce unreliable projections.
-By flagging negative values and separating them into an Adjustments category, I preserved the integrity of the primary billing analysis while still keeping that data available for accounting reconciliation. Finance teams can now trust that the billing figures in the main dataset represent actual charges, not a mix of charges and unprocessed credits.
+### Age Group Bucketing
+- **Range Check:** `patient_age` ranged from **13 to 89** with a mean of
+  approximately 51.5 — no invalid values were found
+- **Bucketing:** Created four age group buckets to match the dashboard
+  age breakdown visible in the Count of Age Bucket donut chart:
+  - **Teen (13-17)** — 1.62% of total patients
+  - **Young (18-35)** — 29.68% of total patients
+  - **Middle Age (36-60)** — 37.67% of total patients
+  - **Senior (61-89)** — 31.02% of total patients
+- These buckets feed directly into the age distribution donut chart on
+  the dashboard — without this transformation step, only raw age values
+  would have been available and the grouped breakdown would not have been
+  possible
 
-Impact of Validating Date Logic
-Verifying that no discharge date preceded an admission date protected the integrity of one of the most operationally important metrics in healthcare analytics: Length of Stay (LOS). LOS drives decisions about bed turnover, resource scheduling, staffing ratios, and cost-per-episode calculations. A single inverted date pair can corrupt an entire LOS distribution if it is not caught.
-Although my validation returned zero violations in this dataset, the process of building that check into the pipeline means future data loads are also protected. Any record with an illogical date range will be caught before it reaches the warehouse rather than silently distorting reports months later.
+### Data Type Enforcement
+- **Dates:** Enforced `Date of Admission` and `Discharge Date` as **DATE**
+  types, not VARCHAR, so all date-based queries behave consistently
+- **Billing:** Enforced `Billing Amount` as **DECIMAL** for financial
+  precision, not FLOAT
+- **Age and Room Number:** Enforced as **INTEGER** — no decimals meaningful
+- **Categorical columns:** Enforced as standardized string categories with
+  controlled vocabularies to prevent undocumented values from entering on
+  future loads
 
-Impact of Enforcing Data Types and Load Constraints
-Loading dates as strings instead of proper DATE types is one of the most common and quietly destructive ETL mistakes. A string-stored date cannot be filtered by date range, aggregated by month or quarter, or used in any time-series calculation without first converting it — and if that conversion is inconsistent across different queries or tools, results will vary depending on who runs the report and how.
-By enforcing DATE types at the schema level, along with constraints like Billing Amount >= 0 and Discharge Date >= Date of Admission, I made the data warehouse itself a line of defense. Future data loads are validated automatically, which means analysts and business users can query the data with confidence rather than having to second-guess whether the underlying records are trustworthy.
+## Load & Pipeline Design
+- **Schema Constraints:** Defined hard constraints at the warehouse level:
+  - `Billing Amount >= 0` in the main billing table — adjusted records
+    handled in a separate adjustments table
+  - `Discharge Date >= Date of Admission` enforced at the schema level
+  - `Age` constrained between 0 and 130
+  - `Gender`, `Medical Condition`, `Admission Type`, `Medication`,
+    `Test Results`, `Blood Type`, and `Insurance Provider` restricted to
+    their validated controlled vocabularies
+- **Deduplication at Load:** Built a composite key check using
+  `Patient Name + Date of Admission + Hospital` so only net-new records
+  are inserted on each pipeline run — preventing duplicate accumulation
+  from recurring on every future load
+- **Partitioning:** Enforced partitioning by admission year so the
+  year-over-year trend analysis and annual aggregations run efficiently
+  without full table scans
+
+## Dashboard Construction
+
+### Overview Page
+- **KPI Cards:** Four summary cards at the top of the dashboard showing:
+  - **Total Revenue** — $1.42bn across all valid admissions
+  - **Total No. of Admissions** — 40,235 patient visits
+  - **Total No. of Hospitals** — 39,876 distinct facilities
+  - **Total No. of Doctors** — 40,341 practitioners
+- **Patients by Blood Type:** Horizontal bar chart showing all 8 ABO/Rh
+  combinations — A leading at 7.0K, followed by A+ at 7.0K, AB+ at 6.9K,
+  AB- at 6.9K, B+ at 6.9K, B at 6.9K, O+ at 6.9K, and O- at 6.5K —
+  distribution is nearly uniform across all blood types
+- **Patients by Medical Condition:** Horizontal bar chart showing all 6
+  conditions nearly evenly distributed — Arthritis at 9.3K, Diabetes at
+  9.3K, Hypertension at 9.2K, Obesity at 9.2K, Cancer at 9.2K, and
+  Asthma at 9.2K
+- **Patients by Insurance Provider:** Horizontal bar chart showing Cigna
+  leading at 11.2K, Medicare at 11.2K, UnitedHealthcare at 11.1K, Blue
+  Cross at 11.1K, and Aetna at 10.9K
+- **Patients by Medication:** Horizontal bar chart showing all 5 medications
+  nearly evenly distributed — Lipitor, Ibuprofen, Aspirin, Paracetamol,
+  and Penicillin each at approximately 11.1K
+- **Gender Distribution:** Donut chart showing Male at 49.96% and Female
+  at 50.04% — an almost perfectly balanced gender split
+- **Admission Type:** Donut chart showing Elective at 33.61%, Emergency at
+  33.47%, and Urgent at 32.92% — evenly distributed across all three types
+- **Test Results:** Donut chart showing Abnormal at 33.56%, Inconclusive at
+  33.38%, and Normal at 33.07% — nearly equal thirds across all outcomes
+- **Age Bucket Distribution:** Donut chart showing Middle Age at 37.67%,
+  Senior at 31.02%, Young at 29.68%, and Teen at 1.62%
+- **Admission Trend YoY:** Line chart tracking annual admission volume from
+  2019 through 2024 — starting at 7.4K in 2019, growing to 10.9K in 2020,
+  11.3K in 2021, peaking at 11.0K in both 2022 and 2023, then dropping to
+  3.9K in 2024 as the most recent partial year of data
+- **Filters:** Doctor, Hospital, Insurance Provider, and Date of Admission
+  slicers allow any combination of filters to be applied across all visuals
+  simultaneously
+
+## Business Impact
+
+### Removing 534 Duplicate Records
+- **Risk Prevented:** The Total No. of Admissions KPI, all medical condition
+  breakdowns, all insurance provider volumes, and the year-over-year trend
+  line would have been inflated by 534 phantom records that never occurred —
+  overstating every count-based metric across both dashboard pages
+- **Financial Impact:** With an average billing amount of approximately
+  $25,500 per admission, 534 duplicate records represented over **$13.6
+  million in phantom revenue** that would have inflated the $1.42bn Total
+  Revenue KPI if left uncleaned
+- **Operational Impact:** For hospital administrators using admission counts
+  to make staffing, bed allocation, and resource planning decisions, inflated
+  figures would have led to overprojecting demand and misallocating budgets
+  based on visits that never happened
+
+### Standardizing Patient Name Formatting
+- **Risk Prevented:** Without consistent casing, the same patient under
+  different name formats would appear as multiple distinct individuals —
+  breaking readmission tracking, fragmenting longitudinal patient records,
+  and causing name-based deduplication to produce false negatives
+- **Operational Impact:** Every name-based join, patient lookup, and
+  cross-table match now behaves consistently across every tool and analyst
+  accessing the data — a patient returning for a follow-up visit is
+  correctly linked to their prior record regardless of how their name was
+  typed at admission
+
+### Resolving 108 Negative Billing Records
+- **Risk Prevented:** Negative values summed alongside positive charges would
+  have understated total revenue, distorted average billing per condition,
+  and produced unreliable financial projections for insurance reimbursement
+  planning
+- **Dashboard Impact:** The Total Revenue figure of **$1.42bn** on the
+  dashboard reflects only actual patient charges — finance teams can trust
+  that number as a true revenue figure rather than a mix of charges and
+  unprocessed credits sitting in the wrong field
+
+### Converting Date Strings to Datetime Objects
+- **Risk Prevented:** String-stored dates cannot be reliably filtered by
+  range, grouped by month or year, or used in time-series calculations
+  without conversion — two analysts writing the same query with slightly
+  different string formatting would get different results from identical
+  underlying data
+- **Dashboard Impact:** The Admission Trend YoY line chart tracking growth
+  from 2019 through 2024, and all date-based filtering through the Date of
+  Admission slicer, depend entirely on correctly typed datetime values —
+  none of those visualizations would have been buildable from raw string
+  timestamps
+
+### Creating Age Group Buckets
+- **Operational Impact:** Raw age values ranging from 13 to 89 are not
+  directly usable as a dashboard dimension — grouping them into Teen, Young,
+  Middle Age, and Senior enabled the Count of Age Bucket donut chart visible
+  on the dashboard
+- **Insight Unlocked:** The bucketing revealed that Middle Age patients
+  (36-60) make up the largest segment at 37.67%, followed by Seniors at
+  31.02% and Young adults at 29.68% — giving clinical leadership a clear
+  view of which demographic is driving the majority of ER demand and where
+  to focus condition management and preventive care programs
+
+### Enforcing Schema Constraints at Load
+- **Risk Prevented:** Without constraints, future data loads could silently
+  introduce negative billing amounts, inverted date pairs, undocumented
+  medical conditions, or out-of-range ages — corrupting the warehouse and
+  every dashboard built on top of it without producing any visible error
+- **Operational Impact:** Any future record violating a constraint is
+  rejected and logged at ingestion, creating an auditable trail of data
+  quality incidents rather than allowing bad data to accumulate undetected
+  and corrupt KPIs months after the initial cleanup
+
+### Building Deduplication Into the Pipeline
+- **Risk Prevented:** Removing the 534 existing duplicates was a one-time
+  fix — without a structural change to the load process, the same problem
+  would recur on every future pipeline run
+- **Operational Impact:** The composite key check at load time means the
+  warehouse can never accumulate duplicates from repeated loads, even if
+  the upstream system delivers the same file twice — eliminating an entire
+  category of recurring data quality risk without requiring manual
+  intervention on future runs
+
+## Key Insights
+- **Revenue:** Total revenue across all valid admissions reached **$1.42bn**
+  with an average billing amount of approximately $25,500 per admission
+- **Volume:** 40,235 total admissions handled across 39,876 hospitals and
+  40,341 doctors — admissions peaked in 2022-2023 at 11.0K per year
+- **Demographics:** Gender split was nearly perfectly even at 49.96% Male
+  and 50.04% Female — Middle Age patients made up the largest age segment
+  at 37.67% of total volume
+- **Conditions:** All 6 medical conditions were nearly evenly distributed
+  across the patient population — Arthritis and Diabetes each at 9.3K
+- **Admissions:** All three admission types were nearly equally distributed
+  — Elective at 33.61%, Emergency at 33.47%, and Urgent at 32.92%
+- **Test Results:** Results split almost evenly into thirds — Abnormal at
+  33.56%, Inconclusive at 33.38%, and Normal at 33.07%
+- **Trend:** Admission volume grew steadily from 7.4K in 2019 to a peak of
+  11.0K in 2022-2023 before the partial 2024 data recorded 3.9K admissions
+
+## Repository Structure
+- `/data`: Raw CSV file used for analysis
+- `/notebooks`: Python notebook containing all cleaning and validation steps
+- `/outputs`: Cleaned dataset exported after all transformations were applied
+- `/dashboard`: Power BI workbook containing the Healthcare Analytics Dashboardmade the data warehouse itself a line of defense. Future data loads are validated automatically, which means analysts and business users can query the data with confidence rather than having to second-guess whether the underlying records are trustworthy.
